@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoteGuard | Secure Voting Platform</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="landing-page">
+    <div class="landing-shell">
+        <header class="landing-hero">
+           
+            <div class="landing-hero-topline">
+                <img src="{{ url_for('static', filename='img/voteguard-mark.svg') }}" alt="VoteGuard logo" class="brand-mark-large landing-hero-mark">
+                <div class="landing-hero-heading">
+                    <h1>VoteGuard</h1>
+                    <span class="brand-subtitle landing-hero-subtitle">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Secure voting platform</span>
+                </div>
+            </div>
+            <p class="landing-hero-description">
+                VoteGuard keeps voter registration, verified sign-in, and election administration in one clear workflow built for accuracy.
+            </p>
+            <div class="hero-meta hero-meta-compact">
+                <span class="feature-pill">Single registration per voter</span>
+                <span class="feature-pill">Conservative face verification</span>
+                <span class="feature-pill">Clear poll management</span>
+                <span class="feature-pill">Live operational results</span>
+            </div>
+        </header>
+
+        <section class="entry-grid">
+            <article class="entry-card entry-card-voter">
+                <span class="eyebrow">Voter Access</span>
+                <div class="card-icon">VP</div>
+                <h2>Voter Portal</h2>
+                <p>
+                    Register once, manage your profile, and enter active polls through a cleaner verified voting workflow.
+                </p>
+                <div class="entry-actions">
+                    <a href="{{ url_for('user.login') }}" class="btn btn-primary">Open Voter Login</a>
+                    <a href="{{ url_for('user.register') }}" class="btn btn-secondary">Register to Vote</a>
+                </div>
+            </article>
+
+            <article class="entry-card entry-card-admin">
+                <span class="eyebrow">Election Operations</span>
+                <div class="card-icon">AD</div>
+                <h2>Admin Workspace</h2>
+                <p>
+                    Create polls, manage candidate records, verify receipts, and monitor election activity from a single professional control surface.
+                </p>
+                <div class="entry-actions">
+                    <a href="{{ url_for('admin.login') }}" class="btn btn-primary">Open Admin Login</a>
+                    <a href="{{ url_for('admin.register') }}" class="btn btn-secondary">Register Admin</a>
+                </div>
+            </article>
+        </section>
+
+        <p class="landing-note">
+            VoteGuard — Secure Identity, One Verified Vote.
+        </p>
+    </div>
+</body>
+</html>

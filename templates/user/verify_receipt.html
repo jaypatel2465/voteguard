@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Receipt | VoteGuard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="user-page">
+    <nav class="navbar">
+        <div class="nav-brand">
+    <img src="{{ url_for('static', filename='img/voteguard-mark.svg') }}" alt="VoteGuard logo" class="brand-mark">
+    <div class="brand-copy">
+        <span class="brand-name">VoteGuard</span>
+        <span class="brand-subtitle">Voter Portal</span>
+    </div>
+</div>
+        <div class="nav-links">
+            <a href="{{ url_for('user.home') }}" class="btn btn-secondary">Back</a>
+            <a href="{{ url_for('user.logout') }}" class="btn btn-secondary">Logout</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1 class="page-title">Verify Acknowledgement Slip</h1>
+
+        {% if error %}
+        <div class="alert alert-error">
+            <p>{{ error }}</p>
+        </div>
+        {% endif %}
+
+        {% if verified %}
+        <div class="form-card">
+            <h3>Receipt Details</h3>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Voter:</span>
+                    <span class="info-value">{{ voter.first_name }} {{ voter.last_name }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Candidate:</span>
+                    <span class="info-value">{{ candidate.candidate_name if candidate else 'Unknown' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Party:</span>
+                    <span class="info-value">{{ candidate.party_name if candidate else 'Unknown' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Poll:</span>
+                    <span class="info-value">{{ poll.title if poll else 'N/A' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Timestamp:</span>
+                    <span class="info-value">{{ receipt.generated_at }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Receipt Hash:</span>
+                    <span class="info-value">{{ receipt.receipt_hash }}</span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="form-card">
+            <h3>Scan QR Code</h3>
+            <p class="muted-text">Use your camera to scan the QR code on the receipt.</p>
+            <div class="camera-box">
+                <video id="qrVideo" autoplay playsinline></video>
+            </div>
+            <div class="form-actions">
+                <button id="startScan" class="btn btn-primary" type="button">Start Scan</button>
+                <button id="stopScan" class="btn btn-secondary" type="button">Stop Scan</button>
+            </div>
+            <p id="scanStatus" class="muted-text"></p>
+        </div>
+
+        <div class="form-card">
+            <h3>Manual Verification</h3>
+            <form id="manualForm">
+                <div class="form-group">
+                    <label for="receipt_hash">Receipt Hash</label>
+                    <input type="text" id="receipt_hash" name="receipt_hash" placeholder="Enter receipt hash" required>
+                </div>
+                <button class="btn btn-primary" type="submit">Verify</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        const video = document.getElementById('qrVideo');
+        const statusEl = document.getElementById('scanStatus');
+        const startBtn = document.getElementById('startScan');
+        const stopBtn = document.getElementById('stopScan');
+        let stream = null;
+        let scanning = false;
+        let detector = null;
+
+        function updateStatus(message) {
+            statusEl.textContent = message;
+        }
+
+        function handleCode(value) {
+            if (!value) return;
+            if (value.includes('/voting/verify-receipt/')) {
+                window.location.href = value;
+                return;
+            }
+            window.location.href = `/voting/verify-receipt/${value}`;
+        }
+
+        async function startScan() {
+            if (!('BarcodeDetector' in window)) {
+                updateStatus('QR scanning not supported in this browser. Use manual verification.');
+                return;
+            }
+            if (scanning) return;
+            scanning = true;
+            updateStatus('Starting camera...');
+            detector = new BarcodeDetector({ formats: ['qr_code'] });
+
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+                video.srcObject = stream;
+                updateStatus('Scanning...');
+                scanLoop();
+            } catch (err) {
+                updateStatus('Camera access denied.');
+                scanning = false;
+            }
+        }
+
+        async function scanLoop() {
+            if (!scanning || !detector) return;
+            try {
+                const barcodes = await detector.detect(video);
+                if (barcodes.length > 0) {
+                    scanning = false;
+                    if (stream) stream.getTracks().forEach(t => t.stop());
+                    handleCode(barcodes[0].rawValue);
+                    return;
+                }
+            } catch (err) {
+                console.error(err);
+            }
+            requestAnimationFrame(scanLoop);
+        }
+
+        function stopScan() {
+            scanning = false;
+            if (stream) {
+                stream.getTracks().forEach(t => t.stop());
+                stream = null;
+            }
+            updateStatus('Scan stopped.');
+        }
+
+        startBtn.addEventListener('click', startScan);
+        stopBtn.addEventListener('click', stopScan);
+
+        document.getElementById('manualForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const hash = document.getElementById('receipt_hash').value.trim();
+            if (!hash) return;
+            handleCode(hash);
+        });
+    </script>
+</body>
+</html>

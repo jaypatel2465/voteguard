@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Election Results | VoteGuard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="admin-page">
+    <nav class="navbar">
+        <div class="nav-brand">
+            <img src="{{ url_for('static', filename='img/voteguard-mark.svg') }}" alt="VoteGuard logo" class="brand-mark">
+            <div class="brand-copy">
+                <span class="brand-name">VoteGuard</span>
+                <span class="brand-subtitle">Admin Control Panel</span>
+            </div>
+        </div>
+        <div class="nav-links">
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">Back</a>
+            <a href="{{ url_for('admin.logout') }}" class="btn btn-secondary">Logout</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <span class="portal-label">Reporting</span>
+        <h1 class="page-title">Election Results{% if poll %} | {{ poll.title }}{% endif %}</h1>
+        <p class="muted-text">Review turnout, vote share, and candidate ranking for the selected poll.</p>
+
+        <div class="form-card">
+            <div class="form-group">
+                <label for="pollSelect">Select Poll</label>
+                <select id="pollSelect">
+                    <option value="">-- Choose a Poll --</option>
+                    {% for p in polls %}
+                    <option value="{{ p.id }}" {% if poll and p.id == poll.id %}selected{% endif %}>
+                        {{ p.title }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        {% if poll %}
+        <div class="stats-grid">
+            <div class="stats-card">
+                <h4>Total Voters</h4>
+                <div class="stats-value" id="totalVoters">0</div>
+            </div>
+            <div class="stats-card">
+                <h4>Votes Cast</h4>
+                <div class="stats-value" id="totalVotes">0</div>
+            </div>
+            <div class="stats-card">
+                <h4>Turnout %</h4>
+                <div class="stats-value" id="turnout">0%</div>
+            </div>
+            <div class="stats-card">
+                <h4>Failed Attempts</h4>
+                <div class="stats-value" id="failedAttempts">0</div>
+            </div>
+        </div>
+
+        <div class="dashboard-actions">
+            <a class="btn btn-secondary" href="{{ url_for('admin.export_results_csv', poll_id=poll.id) }}">Export CSV</a>
+            <a class="btn btn-secondary" href="{{ url_for('admin.export_results_pdf', poll_id=poll.id) }}">Export PDF</a>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h3>Vote Share (Candidates)</h3>
+                <canvas id="voteShareChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>Votes by Party</h3>
+                <canvas id="votesByPartyChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>Turnout Over Time</h3>
+                <canvas id="turnoutChart"></canvas>
+            </div>
+        </div>
+
+        <div class="results-container">
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Candidate Name</th>
+                        <th>Party Name</th>
+                        <th>Party Symbol</th>
+                        <th>Vote Count</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsTableBody">
+                    {% for candidate in results %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ candidate.candidate_name }}</td>
+                        <td>{{ candidate.party_name }}</td>
+                        <td>
+                            {% if candidate.party_symbol %}
+                            <img src="{{ url_for('static', filename='uploads/party_symbols/' + candidate.party_symbol) }}"
+                                 alt="{{ candidate.party_name }}"
+                                 class="party-symbol-small">
+                            {% else %}
+                            <span class="muted-text">No Symbol</span>
+                            {% endif %}
+                        </td>
+                        <td><strong>{{ candidate.vote_count }}</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="alert alert-info" id="resultsEmptyState" {% if results %}hidden{% endif %}>
+            <p>No votes have been cast yet.</p>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            <p>Select a poll to view results.</p>
+        </div>
+        {% endif %}
+    </div>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        let voteShareChart, votesByPartyChart, turnoutChart;
+        const partySymbolBaseUrl = {{ url_for('static', filename='uploads/party_symbols/') | tojson }};
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+        }
+
+        function renderResultsTable(results) {
+            const tableBody = document.getElementById('resultsTableBody');
+            const emptyState = document.getElementById('resultsEmptyState');
+            if (!tableBody || !emptyState) return;
+
+            if (!results.length) {
+                tableBody.innerHTML = '';
+                emptyState.hidden = false;
+                return;
+            }
+
+            emptyState.hidden = true;
+            tableBody.innerHTML = results.map((candidate, index) => {
+                const symbolCell = candidate.party_symbol
+                    ? `<img src="${partySymbolBaseUrl}${encodeURIComponent(candidate.party_symbol)}" alt="${escapeHtml(candidate.party_name)}" class="party-symbol-small">`
+                    : '<span class="muted-text">No Symbol</span>';
+
+                return `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${escapeHtml(candidate.candidate_name)}</td>
+                        <td>${escapeHtml(candidate.party_name)}</td>
+                        <td>${symbolCell}</td>
+                        <td><strong>${candidate.vote_count}</strong></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function createCharts(data) {
+            const voteShareCtx = document.getElementById('voteShareChart').getContext('2d');
+            const votesByPartyCtx = document.getElementById('votesByPartyChart').getContext('2d');
+            const turnoutCtx = document.getElementById('turnoutChart').getContext('2d');
+
+            voteShareChart = new Chart(voteShareCtx, {
+                type: 'pie',
+                data: {
+                    labels: data.vote_share.map(v => v.label),
+                    datasets: [{
+                        data: data.vote_share.map(v => v.value),
+                        backgroundColor: ['#155f9e', '#2f8a46', '#aa741f', '#3f6d86', '#b14f49', '#7c8b92']
+                    }]
+                }
+            });
+
+            votesByPartyChart = new Chart(votesByPartyCtx, {
+                type: 'bar',
+                data: {
+                    labels: data.votes_by_party.map(v => v.party),
+                    datasets: [{
+                        label: 'Votes',
+                        data: data.votes_by_party.map(v => v.votes),
+                        backgroundColor: '#155f9e'
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+
+            turnoutChart = new Chart(turnoutCtx, {
+                type: 'line',
+                data: {
+                    labels: data.hourly_turnout.map(h => h.hour),
+                    datasets: [{
+                        label: 'Votes',
+                        data: data.hourly_turnout.map(h => h.count),
+                        borderColor: '#3f6d86',
+                        backgroundColor: 'rgba(63, 109, 134, 0.14)',
+                        fill: true
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        function updateStats(data) {
+            document.getElementById('totalVoters').textContent = data.stats.total_voters;
+            document.getElementById('totalVotes').textContent = data.stats.total_votes;
+            document.getElementById('turnout').textContent = data.stats.turnout_percentage + '%';
+            document.getElementById('failedAttempts').textContent = data.stats.failed_attempts || 0;
+        }
+
+        async function loadDashboardData() {
+            try {
+                const res = await fetch('{{ url_for("admin.dashboard_data", poll_id=poll.id if poll else None) }}');
+                const data = await res.json();
+                if (!data.success) return;
+                updateStats(data);
+                renderResultsTable(data.results || []);
+
+                if (!voteShareChart) {
+                    createCharts(data);
+                } else {
+                    voteShareChart.data.labels = data.vote_share.map(v => v.label);
+                    voteShareChart.data.datasets[0].data = data.vote_share.map(v => v.value);
+                    voteShareChart.update();
+
+                    votesByPartyChart.data.labels = data.votes_by_party.map(v => v.party);
+                    votesByPartyChart.data.datasets[0].data = data.votes_by_party.map(v => v.votes);
+                    votesByPartyChart.update();
+
+                    turnoutChart.data.labels = data.hourly_turnout.map(h => h.hour);
+                    turnoutChart.data.datasets[0].data = data.hourly_turnout.map(h => h.count);
+                    turnoutChart.update();
+                }
+            } catch (e) {
+                console.error('Failed to load dashboard data', e);
+            }
+        }
+
+        document.getElementById('pollSelect').addEventListener('change', (e) => {
+            const pollId = e.target.value;
+            if (!pollId) return;
+            window.location.href = `/admin/results?poll_id=${pollId}`;
+        });
+
+        {% if poll %}
+        loadDashboardData();
+        setInterval(loadDashboardData, 10000);
+        {% endif %}
+    </script>
+</body>
+</html>

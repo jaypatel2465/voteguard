@@ -1,0 +1,31 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="shieldBlue" x1="45" y1="36" x2="184" y2="203" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F5EA8"/>
+      <stop offset="1" stop-color="#143C7A"/>
+    </linearGradient>
+    <linearGradient id="checkGreen" x1="82" y1="154" x2="225" y2="118" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5AAE35"/>
+      <stop offset="1" stop-color="#147D3F"/>
+    </linearGradient>
+    <linearGradient id="faceBlue" x1="92" y1="82" x2="156" y2="168" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#53B7F2"/>
+      <stop offset="1" stop-color="#0F4B8A"/>
+    </linearGradient>
+  </defs>
+  <path d="M128 18C154 38 183 48 212 53V118C212 171 178 212 128 238C78 212 44 171 44 118V53C73 48 102 38 128 18Z" fill="white"/>
+  <path d="M128 27C151 46 176 55 200 59V116C200 162 171 198 128 221C85 198 56 162 56 116V59C80 55 105 46 128 27Z" fill="url(#shieldBlue)"/>
+  <path d="M128 49C147 64 167 72 185 75V113C185 149 163 179 128 199C93 179 71 149 71 113V75C89 72 109 64 128 49Z" fill="#F6FBFF"/>
+  <path d="M121 74C108 77 98 86 94 100C90 114 92 129 100 140C105 147 112 153 121 157C130 161 140 161 148 158C156 156 163 151 168 144C164 145 159 144 156 140C152 136 150 131 151 126C152 121 155 117 160 114C154 105 145 96 135 88C130 84 126 79 121 74Z" fill="url(#faceBlue)"/>
+  <path d="M95 103C111 88 132 85 154 93" stroke="#9EE3FF" stroke-width="2.4" stroke-linecap="round" opacity="0.9"/>
+  <path d="M97 118C119 104 144 103 164 113" stroke="#B6ECFF" stroke-width="2.4" stroke-linecap="round" opacity="0.85"/>
+  <path d="M104 135C124 126 146 127 161 138" stroke="#B6ECFF" stroke-width="2.4" stroke-linecap="round" opacity="0.8"/>
+  <circle cx="102" cy="102" r="5.5" fill="#E8FBFF"/>
+  <circle cx="122" cy="92" r="5.5" fill="#E8FBFF"/>
+  <circle cx="144" cy="97" r="5.5" fill="#E8FBFF"/>
+  <circle cx="113" cy="124" r="5.5" fill="#E8FBFF"/>
+  <circle cx="140" cy="127" r="5.5" fill="#E8FBFF"/>
+  <circle cx="118" cy="149" r="5.5" fill="#E8FBFF"/>
+  <path d="M87 155L116 126L142 153L205 84L170 170L128 210L87 155Z" fill="url(#checkGreen)"/>
+  <path d="M87 155L116 126L142 153L205 84" stroke="#E7F9E7" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity="0.2"/>
+</svg>

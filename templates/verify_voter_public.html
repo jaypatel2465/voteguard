@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Voter E-ID | VoteGuard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="landing-page">
+    <div class="landing-shell">
+        <section class="form-card">
+            <span class="portal-label">Identity Verification</span>
+            <h1 class="page-title">Voter E-ID Verification</h1>
+            <p class="muted-text">This page confirms whether the scanned VoteGuard voter E-ID is valid.</p>
+
+            {% if error %}
+            <div class="alert alert-error">
+                <p>{{ error }}</p>
+            </div>
+            {% endif %}
+
+            {% if verified %}
+            <div class="info-grid">
+                {% if voter.profile_image %}
+                <div class="info-item">
+                    <span class="info-label">Photo</span>
+                    <span class="info-value">
+                        <img class="profile-thumb" src="{{ url_for('static', filename='uploads/profile_photos/' + voter.profile_image) }}" alt="Profile photo">
+                    </span>
+                </div>
+                {% endif %}
+                <div class="info-item">
+                    <span class="info-label">Status</span>
+                    <span class="info-value"><span class="badge badge-success">Verified</span></span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Name</span>
+                    <span class="info-value">{{ voter.first_name }} {{ voter.last_name }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Masked Aadhaar</span>
+                    <span class="info-value">{{ masked_aadhar }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Unique ID</span>
+                    <span class="info-value">{{ voter.eid_hash }}</span>
+                </div>
+            </div>
+            {% endif %}
+        </section>
+    </div>
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Capture | VoteGuard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="user-page">
+    <div class="container-center">
+        <div class="auth-card">
+            <div class="auth-brand">
+                <div class="brand-lockup">
+                    <img src="{{ url_for('static', filename='img/voteguard-mark.svg') }}" alt="VoteGuard logo" class="brand-mark">
+                    <div class="brand-copy">
+                        <span class="brand-name">VoteGuard</span>
+                        <span class="brand-subtitle">Face Enrollment</span>
+                    </div>
+                </div>
+            </div>
+            <div class="auth-header">
+                <h1>Face Capture</h1>
+                <p>Capture your enrollment images for verified face access.</p>
+            </div>
+
+            <div class="info-box">
+                <h3>Capture Instructions</h3>
+                <ul>
+                    <li>Allow camera access when prompted.</li>
+                    <li>Keep your face centered in the frame.</li>
+                    <li>We will capture 10 frames and keep the best enrollment samples.</li>
+                </ul>
+            </div>
+
+            <div class="capture-info">
+                <p><strong>Aadhaar:</strong> {{ masked_aadhar }}</p>
+            </div>
+
+            <div class="camera-box">
+                <video id="cameraPreview" autoplay playsinline></video>
+            </div>
+
+            <div class="progress-text" id="progressText">Ready</div>
+
+            <button id="startCapture" class="btn btn-primary btn-block">Capture Faces</button>
+
+            <div id="captureStatus" class="alert hidden"></div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        const video = document.getElementById('cameraPreview');
+        const startButton = document.getElementById('startCapture');
+        const progressText = document.getElementById('progressText');
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user' },
+                    audio: false
+                });
+                video.srcObject = stream;
+            } catch (err) {
+                showAlert('Camera access denied. Please allow camera permission.', 'error');
+            }
+        }
+
+        function captureFrame() {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 480;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.9);
+            });
+        }
+
+        async function captureBurst(count = 8, interval = 250) {
+            const frames = [];
+            for (let i = 0; i < count; i++) {
+                progressText.textContent = `Capturing frame ${i + 1} of ${count}...`;
+                const blob = await captureFrame();
+                frames.push(blob);
+                await new Promise(r => setTimeout(r, interval));
+            }
+            return frames;
+        }
+
+        startButton.addEventListener('click', async () => {
+            startButton.disabled = true;
+            startButton.textContent = 'Capturing...';
+
+            try {
+                const frames = await captureBurst(10, 200);
+                const formData = new FormData();
+                frames.forEach((blob, idx) => {
+                    formData.append('frames', blob, `frame_${idx}.jpg`);
+                });
+
+                const response = await fetch('{{ url_for("user.capture_face_web") }}', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    showAlert(result.message + ' Redirecting to login...', 'success');
+                    setTimeout(() => {
+                        window.location.href = result.redirect;
+                    }, 1500);
+                } else {
+                    showAlert(result.error, 'error');
+                    startButton.disabled = false;
+                    startButton.textContent = 'Capture Faces';
+                }
+            } catch (err) {
+                showAlert('Face capture failed. Please try again.', 'error');
+                startButton.disabled = false;
+                startButton.textContent = 'Capture Faces';
+            }
+        });
+
+        startCamera();
+    </script>
+</body>
+</html>

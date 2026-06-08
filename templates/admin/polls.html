@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Polls | VoteGuard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="admin-page">
+    <nav class="navbar">
+        <div class="nav-brand">
+            <img src="{{ url_for('static', filename='img/voteguard-mark.svg') }}" alt="VoteGuard logo" class="brand-mark">
+            <div class="brand-copy">
+                <span class="brand-name">VoteGuard</span>
+                <span class="brand-subtitle">Admin Control Panel</span>
+            </div>
+        </div>
+        <div class="nav-links">
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">Back</a>
+            <a href="{{ url_for('admin.logout') }}" class="btn btn-secondary">Logout</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <span class="portal-label">Poll Management</span>
+        <h1 class="page-title">Manage Polls</h1>
+        <p class="muted-text">Create, edit, schedule, and assign election access from one VoteGuard workspace.</p>
+
+        <div class="form-card">
+            <h3>Create New Poll</h3>
+            <form id="pollCreateForm">
+                <div class="form-group">
+                    <label for="title">Poll Title *</label>
+                    <input type="text" id="title" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea id="description" name="description" rows="3"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="poll_start_time">Start Time</label>
+                        <input type="datetime-local" id="poll_start_time" name="poll_start_time">
+                    </div>
+                    <div class="form-group">
+                        <label for="poll_end_time">End Time</label>
+                        <input type="datetime-local" id="poll_end_time" name="poll_end_time">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="checkbox-inline">
+                            <input type="checkbox" id="manual_start" name="manual_start">
+                            Manual Start (No Time Window)
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-inline">
+                            <input type="checkbox" id="allow_nota" name="allow_nota">
+                            Allow NOTA Option
+                        </label>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Create Poll</button>
+            </form>
+        </div>
+
+        <div class="results-container">
+            <h3>Existing Polls</h3>
+            {% if polls %}
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Status</th>
+                        <th>Window</th>
+                        <th>NOTA</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for poll in polls %}
+                    <tr>
+                        <td>{{ poll.id }}</td>
+                        <td>{{ poll.title }}</td>
+                        <td>
+                            {% if poll.status == 'active' %}
+                                <span class="badge badge-success">Active</span>
+                            {% elif poll.status == 'upcoming' %}
+                                <span class="badge badge-info">Upcoming</span>
+                            {% elif poll.status == 'closed' %}
+                                <span class="badge badge-secondary">Closed</span>
+                            {% else %}
+                                <span class="badge badge-warning">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if poll.poll_start_time and poll.poll_end_time %}
+                                {{ poll.poll_start_time }} to {{ poll.poll_end_time }}
+                            {% else %}
+                                <span class="muted-text">Manual</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if poll.allow_nota == 1 %}
+                                <span class="badge badge-success">Yes</span>
+                            {% else %}
+                                <span class="badge badge-warning">No</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="table-actions">
+                                {% if poll.poll_start_time and poll.poll_end_time %}
+                                    <span class="badge badge-info">Auto Schedule</span>
+                                {% else %}
+                                    <button class="btn btn-secondary btn-small" onclick="togglePoll({{ poll.id }}, {{ 0 if poll.is_active == 1 else 1 }})">
+                                        {% if poll.is_active == 1 %}Deactivate{% else %}Activate{% endif %}
+                                    </button>
+                                {% endif %}
+                                <button
+                                    class="btn btn-secondary btn-small"
+                                    data-poll-id="{{ poll.id }}"
+                                    data-title="{{ poll.title|e }}"
+                                    data-description="{{ poll.description|default('', true)|replace('\n',' ')|e }}"
+                                    data-start="{{ poll.poll_start_time|default('', true) }}"
+                                    data-end="{{ poll.poll_end_time|default('', true) }}"
+                                    data-allow-nota="{{ 1 if poll.allow_nota == 1 else 0 }}"
+                                    data-manual="{{ 1 if not poll.poll_start_time and not poll.poll_end_time else 0 }}"
+                                    onclick="openEditModal(this)">
+                                    Edit
+                                </button>
+                                <a class="btn btn-secondary btn-small" href="{{ url_for('admin.poll_results', poll_id=poll.id) }}">Results</a>
+                                <button class="btn btn-secondary btn-small" onclick="openAccessModal({{ poll.id }})">Assign Users</button>
+                                <button class="btn btn-small" style="background:#c0392b;color:#fff;border:none;" onclick="deletePoll({{ poll.id }}, '{{ poll.title|e }}')">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="alert alert-info">No polls created yet.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div id="pollEditModal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Edit Poll</h2>
+            <form id="pollEditForm">
+                <div class="form-group">
+                    <label for="edit_title">Poll Title *</label>
+                    <input type="text" id="edit_title" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit_description">Description</label>
+                    <textarea id="edit_description" name="description" rows="3"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="edit_poll_start_time">Start Time</label>
+                        <input type="datetime-local" id="edit_poll_start_time" name="poll_start_time">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_poll_end_time">End Time</label>
+                        <input type="datetime-local" id="edit_poll_end_time" name="poll_end_time">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="checkbox-inline">
+                            <input type="checkbox" id="edit_manual_start" name="manual_start">
+                            Manual Start (No Time Window)
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-inline">
+                            <input type="checkbox" id="edit_allow_nota" name="allow_nota">
+                            Allow NOTA Option
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="accessModal" class="modal hidden" aria-hidden="true">
+        <div class="modal-content modal-content-compact access-modal-shell" role="dialog" aria-modal="true" aria-labelledby="accessModalTitle">
+            <div class="access-modal-header">
+                <div>
+                    <h2 id="accessModalTitle">Assign Voters</h2>
+                    <p class="modal-intro">Only selected users will be able to view and vote in <strong id="accessModalPollTitle"></strong>.</p>
+                </div>
+                <div class="selection-count-card">
+                    <span class="selection-count-label">Selected</span>
+                    <strong id="accessSelectedCount">0 voters</strong>
+                </div>
+            </div>
+
+            <div class="access-modal-body">
+                <div class="upload-panel">
+                    <div class="upload-panel-header">
+                        <div>
+                            <h3>Bulk Assign via CSV</h3>
+                            <p class="muted-text">Upload a CSV with <strong>aadhar_number</strong>, <strong>email</strong>, or <strong>phone</strong>. Aadhaar values are hashed before lookup and never displayed raw.</p>
+                        </div>
+                        <button type="button" class="btn btn-secondary btn-small" onclick="downloadSampleCsv()">Download Sample CSV</button>
+                    </div>
+                    <div class="upload-panel-body">
+                        <input type="file" id="voterCsvFile" accept=".csv,text/csv">
+                        <button type="button" class="btn btn-primary btn-small" id="uploadCsvBtn" onclick="uploadVotersCsv()">Upload CSV</button>
+                    </div>
+                    <p class="inline-note muted-text">CSV only. Maximum file size: {{ max_voter_csv_size_mb }} MB. Duplicate rows and already assigned voters are skipped safely.</p>
+                    <div id="csvUploadSummary" class="upload-summary hidden"></div>
+                </div>
+
+                <div class="upload-panel">
+                    <div class="upload-panel-header">
+                        <div>
+                            <h3>Manual Select Voters</h3>
+                            <p class="muted-text">Search and tick voters</p>
+                        </div>
+                    </div>
+                    <div class="selection-toolbar">
+                        <input type="text" id="accessSearch" class="search-input" placeholder="Search by name, email, phone, or Aadhaar last 4 digits..." oninput="filterAccessUsers(this.value)">
+                    </div>
+                    <p id="accessSearchMeta" class="inline-note muted-text">Showing all registered voters.</p>
+                    <div id="accessUserList" class="selection-list">
+                        <p class="selection-empty">Loading voters...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-actions access-modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeAccessModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveAccessBtn" onclick="saveAccess()">Assign Voters</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        let editingPollId = null;
+        let accessPollId = null;
+        let allAccessUsers = [];
+        const ACCESS_CSV_MAX_SIZE_BYTES = {{ max_voter_csv_size_bytes|tojson }};
+        const ACCESS_CSV_MAX_SIZE_MB = {{ max_voter_csv_size_mb|tojson }};
+
+        function setBodyModalState(isOpen) {
+            if (isOpen) {
+                VotingSystem.lockBodyScroll();
+            } else {
+                VotingSystem.unlockBodyScroll();
+            }
+        }
+
+        async function openAccessModal(pollId) {
+            accessPollId = pollId;
+            const modal = document.getElementById('accessModal');
+            document.getElementById('accessModalPollTitle').textContent = '';
+            document.getElementById('accessSelectedCount').textContent = '0 voters';
+            document.getElementById('accessUserList').innerHTML = '<p class="selection-empty">Loading voters...</p>';
+            document.getElementById('accessSearch').value = '';
+            document.getElementById('voterCsvFile').value = '';
+            clearUploadSummary();
+            modal.classList.remove('hidden');
+            modal.style.display = 'flex';
+            setBodyModalState(true);
+
+            await fetchAccessUsers(pollId);
+        }
+
+        function normalizeAccessValue(value) {
+            return String(value || '').trim();
+        }
+
+        function escapeAccessHtml(value) {
+            return normalizeAccessValue(value)
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+        }
+
+        function buildAccessSearchBlob(user) {
+            return [
+                normalizeAccessValue(user.name),
+                normalizeAccessValue(user.email),
+                normalizeAccessValue(user.phone),
+                normalizeAccessValue(user.aadhar_last4)
+            ].join(' ').toLowerCase();
+        }
+
+        function updateAccessSearchMeta(visibleCount, totalCount, query = '') {
+            const meta = document.getElementById('accessSearchMeta');
+            const trimmedQuery = normalizeAccessValue(query);
+
+            if (!trimmedQuery) {
+                meta.textContent = totalCount
+                    ? `Showing all registered voters (${visibleCount}).`
+                    : 'No registered voters available for this poll yet.';
+                return;
+            }
+
+            meta.textContent = visibleCount === 1
+                ? `Showing 1 matching voter for "${trimmedQuery}".`
+                : `Showing ${visibleCount} matching voters for "${trimmedQuery}".`;
+        }
+
+        function getFilteredAccessUsers(query) {
+            const trimmedQuery = normalizeAccessValue(query).toLowerCase();
+            if (!trimmedQuery) {
+                return allAccessUsers;
+            }
+            return allAccessUsers.filter((user) => user.searchBlob.includes(trimmedQuery));
+        }
+
+        async function fetchAccessUsers(pollId, options = {}) {
+            try {
+                const res = await fetch(`/admin/polls/${pollId}/access`);
+                const data = await res.json();
+                if (!data.success) { showAlert(data.error, 'error'); return; }
+
+                const previousSelectionState = options.preserveSelectionState
+                    ? new Map(allAccessUsers.map((user) => [user.id, Boolean(user.selected)]))
+                    : new Map();
+                document.getElementById('accessModalPollTitle').textContent = data.poll_title;
+                allAccessUsers = data.users.map((user) => ({
+                    ...user,
+                    name: normalizeAccessValue(user.name) || 'Unnamed voter',
+                    email: normalizeAccessValue(user.email),
+                    phone: normalizeAccessValue(user.phone),
+                    aadhar_last4: normalizeAccessValue(user.aadhar_last4),
+                    selected: previousSelectionState.has(user.id)
+                        ? (previousSelectionState.get(user.id) || Boolean(user.assigned))
+                        : Boolean(user.assigned)
+                }));
+                allAccessUsers = allAccessUsers.map((user) => ({
+                    ...user,
+                    searchBlob: buildAccessSearchBlob(user)
+                }));
+                filterAccessUsers(document.getElementById('accessSearch').value);
+            } catch (e) {
+                showAlert('Failed to load users', 'error');
+            }
+        }
+
+        function updateAccessSelectedCount() {
+            const count = allAccessUsers.filter(user => user.selected).length;
+            const label = count === 1 ? '1 voter' : `${count} voters`;
+            document.getElementById('accessSelectedCount').textContent = label;
+            document.getElementById('saveAccessBtn').textContent = count > 0 ? `Assign ${label}` : 'Assign Voters';
+        }
+
+        function clearUploadSummary() {
+            const summary = document.getElementById('csvUploadSummary');
+            summary.classList.add('hidden');
+            summary.innerHTML = '';
+        }
+
+        function renderUploadSummary(result) {
+            const summary = document.getElementById('csvUploadSummary');
+            const failedEntries = result.total - result.assigned;
+            const errors = Array.isArray(result.errors) ? result.errors : [];
+
+            summary.classList.remove('hidden');
+            summary.innerHTML = `
+                <div class="upload-summary-grid">
+                    <div class="upload-summary-card">
+                        <span class="upload-summary-label">Total Processed</span>
+                        <strong>${result.total}</strong>
+                    </div>
+                    <div class="upload-summary-card">
+                        <span class="upload-summary-label">Assigned</span>
+                        <strong>${result.assigned}</strong>
+                    </div>
+                    <div class="upload-summary-card">
+                        <span class="upload-summary-label">Failed Entries</span>
+                        <strong>${failedEntries}</strong>
+                    </div>
+                    <div class="upload-summary-card">
+                        <span class="upload-summary-label">Duplicates Skipped</span>
+                        <strong>${result.duplicates}</strong>
+                    </div>
+                </div>
+                ${errors.length ? `
+                    <div class="upload-error-list">
+                        <h4>Skipped Rows</h4>
+                        <ul>
+                            ${errors.map(error => `
+                                <li>Row ${error.row}: ${error.reason}${error.identifier ? ` (${error.identifier})` : ''}</li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                ` : '<p class="inline-note">All matched voters were processed successfully.</p>'}
+            `;
+        }
+
+        function downloadSampleCsv() {
+            const sample = [
+                'aadhar_number,email,phone',
+                '123456789012,test1@gmail.com,',
+                ',test2@gmail.com,9876543210'
+            ].join('\n');
+            const blob = new Blob([sample], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'voter_assignment_sample.csv';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        async function uploadVotersCsv() {
+            if (!accessPollId) {
+                showAlert('Open a poll before uploading voters', 'error');
+                return;
+            }
+
+            const fileInput = document.getElementById('voterCsvFile');
+            const uploadButton = document.getElementById('uploadCsvBtn');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                showAlert('Select a CSV file to upload', 'error');
+                return;
+            }
+            if (!file.name.toLowerCase().endsWith('.csv')) {
+                showAlert('Only CSV files are allowed', 'error');
+                return;
+            }
+            if (file.size > ACCESS_CSV_MAX_SIZE_BYTES) {
+                showAlert(`CSV file is too large. Maximum size is ${ACCESS_CSV_MAX_SIZE_MB} MB`, 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+            uploadButton.disabled = true;
+            uploadButton.textContent = 'Uploading...';
+
+            try {
+                const response = await fetch(`/admin/poll/${accessPollId}/upload-voters`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                if (!response.ok || !result.success) {
+                    showAlert(result.error || 'Failed to upload CSV', 'error');
+                    return;
+                }
+
+                renderUploadSummary(result);
+                showAlert(result.message, 'success');
+                fileInput.value = '';
+                await fetchAccessUsers(accessPollId, { preserveSelectionState: true });
+            } catch (error) {
+                showAlert('Failed to upload CSV', 'error');
+            } finally {
+                uploadButton.disabled = false;
+                uploadButton.textContent = 'Upload CSV';
+            }
+        }
+
+        function renderAccessUsers(users, query = '') {
+            const list = document.getElementById('accessUserList');
+            const trimmedQuery = normalizeAccessValue(query);
+            updateAccessSearchMeta(users.length, allAccessUsers.length, trimmedQuery);
+            if (!users.length) {
+                list.innerHTML = trimmedQuery
+                    ? `<p class="selection-empty">No voters matched "${escapeAccessHtml(trimmedQuery)}".</p>`
+                    : '<p class="selection-empty">No registered voters found.</p>';
+                updateAccessSelectedCount();
+                return;
+            }
+            list.innerHTML = users.map(u => `
+                <label class="selection-row" for="access-user-${u.id}">
+                    <input type="checkbox" id="access-user-${u.id}" data-user-id="${u.id}" ${u.selected ? 'checked' : ''}>
+                    <span class="selection-meta">
+                        <span class="selection-primary">${escapeAccessHtml(u.name)}</span>
+                        <span class="selection-secondary">${escapeAccessHtml(u.email || 'No email registered')}</span>
+                        ${(u.phone || u.aadhar_last4) ? `<span class="selection-secondary">${escapeAccessHtml(u.phone ? `Phone: ${u.phone}` : '')}${u.phone && u.aadhar_last4 ? ' · ' : ''}${escapeAccessHtml(u.aadhar_last4 ? `Aadhaar ending ${u.aadhar_last4}` : '')}</span>` : ''}
+                    </span>
+                </label>
+            `).join('');
+            updateAccessSelectedCount();
+        }
+
+        function filterAccessUsers(query) {
+            renderAccessUsers(getFilteredAccessUsers(query), query);
+        }
+
+        function closeAccessModal() {
+            document.getElementById('accessModal').classList.add('hidden');
+            document.getElementById('accessModal').style.display = 'none';
+            document.getElementById('voterCsvFile').value = '';
+            clearUploadSummary();
+            accessPollId = null;
+            allAccessUsers = [];
+            setBodyModalState(false);
+        }
+
+        async function saveAccess() {
+            const user_ids = allAccessUsers.filter(user => user.selected).map(user => user.id);
+            const btn = document.getElementById('saveAccessBtn');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+            try {
+                const res = await fetch(`/admin/polls/${accessPollId}/access`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_ids })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    closeAccessModal();
+                } else {
+                    showAlert(data.error, 'error');
+                }
+            } catch (e) {
+                showAlert('Failed to save assignments', 'error');
+            } finally {
+                btn.disabled = false;
+                updateAccessSelectedCount();
+            }
+        }
+
+        function normalizeDateValue(value) {
+            if (!value) return '';
+            let normalized = value.replace(' ', 'T');
+            if (normalized.length > 16) normalized = normalized.slice(0, 16);
+            return normalized;
+        }
+
+        function openEditModal(button) {
+            const modal = document.getElementById('pollEditModal');
+            editingPollId = button.dataset.pollId;
+            document.getElementById('edit_title').value = button.dataset.title || '';
+            document.getElementById('edit_description').value = button.dataset.description || '';
+            document.getElementById('edit_poll_start_time').value = normalizeDateValue(button.dataset.start);
+            document.getElementById('edit_poll_end_time').value = normalizeDateValue(button.dataset.end);
+            const manual = button.dataset.manual === '1';
+            document.getElementById('edit_manual_start').checked = manual;
+            document.getElementById('edit_allow_nota').checked = button.dataset.allowNota === '1';
+            toggleEditTimeFields(manual);
+            modal.classList.remove('hidden');
+            modal.style.display = 'flex';
+            setBodyModalState(true);
+        }
+
+        function closeEditModal() {
+            document.getElementById('pollEditModal').classList.add('hidden');
+            document.getElementById('pollEditModal').style.display = 'none';
+            editingPollId = null;
+            setBodyModalState(false);
+        }
+
+        document.getElementById('accessUserList').addEventListener('change', (event) => {
+            if (event.target.matches('input[type="checkbox"][data-user-id]')) {
+                const userId = Number(event.target.dataset.userId);
+                allAccessUsers = allAccessUsers.map((user) => (
+                    user.id === userId
+                        ? { ...user, selected: event.target.checked }
+                        : user
+                ));
+                updateAccessSelectedCount();
+            }
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key !== 'Escape') return;
+            if (!document.getElementById('accessModal').classList.contains('hidden')) {
+                closeAccessModal();
+                return;
+            }
+            if (!document.getElementById('pollEditModal').classList.contains('hidden')) {
+                closeEditModal();
+            }
+        });
+
+        document.getElementById('pollEditForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!editingPollId) { showAlert('No poll selected', 'error'); return; }
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            data.allow_nota = document.getElementById('edit_allow_nota').checked ? '1' : '0';
+            if (document.getElementById('edit_manual_start').checked) {
+                data.poll_start_time = '';
+                data.poll_end_time = '';
+            }
+            try {
+                const response = await fetch(`/admin/polls/${editingPollId}/update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showAlert(result.message, 'success');
+                    closeEditModal();
+                    setTimeout(() => location.reload(), 800);
+                } else {
+                    showAlert(result.error, 'error');
+                }
+            } catch (err) {
+                showAlert('Failed to update poll', 'error');
+            }
+        });
+
+        document.getElementById('pollCreateForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            data.allow_nota = document.getElementById('allow_nota').checked ? '1' : '0';
+            if (document.getElementById('manual_start').checked) {
+                data.poll_start_time = '';
+                data.poll_end_time = '';
+            }
+            try {
+                const response = await fetch('{{ url_for("admin.manage_polls") }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showAlert(result.message, 'success');
+                    setTimeout(() => location.reload(), 800);
+                } else {
+                    showAlert(result.error, 'error');
+                }
+            } catch (err) {
+                showAlert('Failed to create poll', 'error');
+            }
+        });
+
+        async function togglePoll(pollId, isActive) {
+            try {
+                const response = await fetch(`/admin/polls/${pollId}/toggle`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ is_active: isActive })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showAlert(result.message, 'success');
+                    setTimeout(() => location.reload(), 800);
+                } else {
+                    showAlert(result.error, 'error');
+                }
+            } catch (err) {
+                showAlert('Failed to update poll status', 'error');
+            }
+        }
+
+        async function deletePoll(pollId, pollTitle) {
+            if (!confirm(`Delete "${pollTitle}"?\n\nThis will permanently remove the poll, all its candidates, votes, receipts, and voter assignments. This cannot be undone.`)) return;
+            try {
+                const response = await fetch(`/admin/polls/${pollId}/delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showAlert(result.message, 'success');
+                    setTimeout(() => location.reload(), 800);
+                } else {
+                    showAlert(result.error, 'error');
+                }
+            } catch (err) {
+                showAlert('Failed to delete poll', 'error');
+            }
+        }
+
+        function toggleTimeFields(disabled) {
+            document.getElementById('poll_start_time').disabled = disabled;
+            document.getElementById('poll_end_time').disabled = disabled;
+        }
+
+        function toggleEditTimeFields(disabled) {
+            document.getElementById('edit_poll_start_time').disabled = disabled;
+            document.getElementById('edit_poll_end_time').disabled = disabled;
+        }
+
+        document.getElementById('manual_start').addEventListener('change', (e) => {
+            toggleTimeFields(e.target.checked);
+            if (e.target.checked) {
+                document.getElementById('poll_start_time').value = '';
+                document.getElementById('poll_end_time').value = '';
+            }
+        });
+
+        document.getElementById('edit_manual_start').addEventListener('change', (e) => {
+            toggleEditTimeFields(e.target.checked);
+            if (e.target.checked) {
+                document.getElementById('edit_poll_start_time').value = '';
+                document.getElementById('edit_poll_end_time').value = '';
+            }
+        });
+    </script>
+</body>
+</html>

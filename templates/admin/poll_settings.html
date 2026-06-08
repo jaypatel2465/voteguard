@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poll Settings | VoteGuard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="admin-page">
+    <nav class="navbar">
+        <div class="nav-brand">
+    <img src="{{ url_for('static', filename='img/voteguard-mark.svg') }}" alt="VoteGuard logo" class="brand-mark">
+    <div class="brand-copy">
+        <span class="brand-name">VoteGuard</span>
+        <span class="brand-subtitle">Admin Control Panel</span>
+    </div>
+</div>
+        <div class="nav-links">
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">Back</a>
+            <a href="{{ url_for('admin.logout') }}" class="btn btn-secondary">Logout</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1 class="page-title">Poll Settings</h1>
+
+        <div class="form-card">
+            <form id="pollForm">
+                <div class="form-group">
+                    <label for="poll_start_time">Poll Start Time</label>
+                    <input type="datetime-local" id="poll_start_time" name="poll_start_time" required>
+                </div>
+                <div class="form-group">
+                    <label for="poll_end_time">Poll End Time</label>
+                    <input type="datetime-local" id="poll_end_time" name="poll_end_time" required>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Save Settings</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="form-card">
+            <h3>Manual Toggle</h3>
+            <p class="muted-text">Manual activation acts as an emergency stop within the scheduled window.</p>
+            <div class="toggle-actions">
+                <button class="btn btn-secondary" onclick="togglePoll(1)">Activate Poll</button>
+                <button class="btn btn-secondary" onclick="togglePoll(0)">Deactivate Poll</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        const startValue = "{{ settings.poll_start_time or '' }}";
+        const endValue = "{{ settings.poll_end_time or '' }}";
+
+        if (startValue) {
+            document.getElementById('poll_start_time').value = startValue.replace(' ', 'T').slice(0, 16);
+        }
+        if (endValue) {
+            document.getElementById('poll_end_time').value = endValue.replace(' ', 'T').slice(0, 16);
+        }
+
+        document.getElementById('pollForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+
+            try {
+                const response = await fetch('{{ url_for("admin.poll_settings") }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showAlert('Poll settings updated.', 'success');
+                } else {
+                    showAlert(result.error, 'error');
+                }
+            } catch (err) {
+                showAlert('Failed to update poll settings', 'error');
+            }
+        });
+
+        async function togglePoll(isActive) {
+            try {
+                const response = await fetch('{{ url_for("admin.toggle_poll") }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ is_active: isActive })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showAlert(result.message, 'success');
+                } else {
+                    showAlert(result.error, 'error');
+                }
+            } catch (err) {
+                showAlert('Failed to update poll status', 'error');
+            }
+        }
+    </script>
+</body>
+</html>

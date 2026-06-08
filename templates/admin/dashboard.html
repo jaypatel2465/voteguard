@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | VoteGuard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="admin-page">
+    <nav class="navbar">
+        <div class="nav-brand">
+            <img src="{{ url_for('static', filename='img/voteguard-mark.svg') }}" alt="VoteGuard logo" class="brand-mark">
+            <div class="brand-copy">
+                <span class="brand-name">VoteGuard</span>
+                <span class="brand-subtitle">Admin Control Panel</span>
+            </div>
+        </div>
+        <div class="nav-links">
+            <a href="{{ url_for('admin.verify_receipt_page') }}" class="btn btn-secondary">Scan QR</a>
+            <a href="{{ url_for('admin.logout') }}" class="btn btn-secondary">Logout</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <span class="portal-label">Operations Workspace</span>
+        <h1 class="page-title">Admin Dashboard</h1>
+        <p class="muted-text">Manage polls, candidate records, verification tools, and reporting from one VoteGuard workspace.</p>
+
+        <div class="dashboard-grid">
+            <div class="dashboard-card" onclick="location.href='{{ url_for('admin.add_candidate') }}'">
+                <div class="card-icon">CA</div>
+                <h3>Add Candidate</h3>
+                <p>Register candidate records and upload party material for each poll.</p>
+            </div>
+
+            <div class="dashboard-card" onclick="location.href='{{ url_for('admin.manage_polls') }}'">
+                <div class="card-icon">PL</div>
+                <h3>Manage Polls</h3>
+                <p>Create elections, configure availability, and assign eligible voters.</p>
+            </div>
+
+            <div class="dashboard-card" onclick="location.href='{{ url_for('admin.results') }}'">
+                <div class="card-icon">RS</div>
+                <h3>View Results</h3>
+                <p>Monitor live vote counts, turnout, and poll-level reporting.</p>
+            </div>
+
+            <div class="dashboard-card" onclick="location.href='{{ url_for('admin.verify_receipt_page') }}'">
+                <div class="card-icon">RC</div>
+                <h3>Scan Receipt</h3>
+                <p>Validate acknowledgement slips against stored receipt records.</p>
+            </div>
+
+            <div class="dashboard-card" onclick="location.href='{{ url_for('admin.verify_voter_page') }}'">
+                <div class="card-icon">ID</div>
+                <h3>Scan Voter ID</h3>
+                <p>Verify digital voter identities and confirm stored registration data.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

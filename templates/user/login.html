@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voter Login | VoteGuard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="user-page">
+    <div class="container-center">
+        <div class="auth-card">
+            <div class="auth-brand">
+                <div class="brand-lockup">
+                    <img src="{{ url_for('static', filename='img/voteguard-mark.svg') }}" alt="VoteGuard logo" class="brand-mark">
+                    <div class="brand-copy">
+                        <span class="brand-name">VoteGuard</span>
+                        <span class="brand-subtitle">Voter Access</span>
+                    </div>
+                </div>
+            </div>
+            <div class="auth-header">
+                <h1>Voter Login</h1>
+                <p>Sign in to your verified VoteGuard voter workspace.</p>
+            </div>
+
+            <div class="login-options">
+                <button class="login-tab active" data-tab="password">Email and Password</button>
+                <button class="login-tab" data-tab="face">Face Login</button>
+            </div>
+
+            <div id="passwordLogin" class="login-method">
+                <form id="passwordLoginForm">
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-block">Login</button>
+                </form>
+            </div>
+
+            <div id="faceLogin" class="login-method hidden">
+                <div class="info-box">
+                    <h3>Face Login</h3>
+                    <p>Allow camera access, complete the live challenge, then continue with face sign-in.</p>
+                </div>
+
+                <div class="camera-box">
+                    <video id="faceLoginPreview" autoplay playsinline></video>
+                    <div class="liveness-overlay">
+                        <span class="liveness-badge">Live Check Required</span>
+                        <p id="loginLivenessInstruction" class="liveness-instruction">Starting camera...</p>
+                        <div class="liveness-meta">
+                            <span id="loginLivenessStatus" class="liveness-status" data-state="info">Waiting for camera access.</span>
+                            <span id="loginLivenessCountdown" class="liveness-countdown"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="liveness-actions">
+                    <button id="retryLoginLivenessBtn" class="btn btn-secondary hidden" type="button">Retry Challenge</button>
+                    <button id="faceLoginBtn" class="btn btn-primary btn-block" type="button" disabled>Complete liveness verification</button>
+                </div>
+            </div>
+
+            <div class="auth-footer">
+                Need an account? <a href="{{ url_for('user.register') }}">Register</a>
+                <div class="muted-text inline-note">
+                    <a href="{{ url_for('index') }}">Back to VoteGuard Home</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+    <script src="{{ url_for('static', filename='js/liveness.js') }}"></script>
+    <script>
+        const facePreview = document.getElementById('faceLoginPreview');
+        const faceLoginBtn = document.getElementById('faceLoginBtn');
+        let faceStream = null;
+        const loginLiveness = VotingSystem.createActiveLiveness({
+            videoId: 'faceLoginPreview',
+            instructionId: 'loginLivenessInstruction',
+            statusId: 'loginLivenessStatus',
+            countdownId: 'loginLivenessCountdown',
+            retryButtonId: 'retryLoginLivenessBtn',
+            actionButtonId: 'faceLoginBtn',
+            challengeUrl: '{{ url_for("user.user_liveness_challenge") }}',
+            waitingLabel: 'Complete liveness verification',
+            readyLabel: 'Capture 10 Frames and Continue',
+            onError: () => {
+                showAlert('Live verification is unavailable in this browser. Use password login or retry camera access.', 'error');
+            }
+        });
+
+        async function startFaceCamera() {
+            if (faceStream) {
+                return;
+            }
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showAlert('Camera access is not supported in this browser.', 'error');
+                return;
+            }
+
+            try {
+                faceStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user' },
+                    audio: false
+                });
+                facePreview.srcObject = faceStream;
+                await loginLiveness.start();
+            } catch (err) {
+                showAlert('Camera access denied. Please allow camera permission.', 'error');
+            }
+        }
+
+        function stopFaceCamera() {
+            loginLiveness.stop();
+            if (faceStream) {
+                faceStream.getTracks().forEach(track => track.stop());
+                faceStream = null;
+                facePreview.srcObject = null;
+            }
+            faceLoginBtn.disabled = true;
+            faceLoginBtn.textContent = 'Complete liveness verification';
+        }
+
+        function captureFaceFrame() {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                canvas.width = facePreview.videoWidth || 640;
+                canvas.height = facePreview.videoHeight || 480;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(facePreview, 0, 0, canvas.width, canvas.height);
+                canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.9);
+            });
+        }
+
+        async function captureBurst(count = 10, interval = 200) {
+            const frames = [];
+            for (let i = 0; i < count; i++) {
+                const blob = await captureFaceFrame();
+                frames.push(blob);
+                await new Promise(resolve => setTimeout(resolve, interval));
+            }
+            return frames;
+        }
+
+        document.querySelectorAll('.login-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+
+                document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                document.getElementById('passwordLogin').classList.toggle('hidden', tabName !== 'password');
+                document.getElementById('faceLogin').classList.toggle('hidden', tabName !== 'face');
+
+                if (tabName === 'face') {
+                    startFaceCamera();
+                } else {
+                    stopFaceCamera();
+                }
+            });
+        });
+
+        document.getElementById('passwordLoginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            data.method = 'password';
+
+            try {
+                const response = await fetch('{{ url_for("user.login") }}', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert('Login successful', 'success');
+                    window.location.href = result.redirect;
+                } else {
+                    showAlert(result.error, 'error');
+                }
+            } catch (error) {
+                showAlert('Login failed. Please try again.', 'error');
+            }
+        });
+
+        faceLoginBtn.addEventListener('click', async () => {
+            const button = faceLoginBtn;
+            if (!loginLiveness.isPassed()) {
+                showAlert('Complete the live challenge before continuing.', 'error');
+                return;
+            }
+            button.disabled = true;
+            button.textContent = 'Capturing frames...';
+
+            try {
+                const frames = [
+                    ...loginLiveness.getEvidenceFrames(),
+                    ...(await captureBurst(10, 200))
+                ];
+                const formData = new FormData();
+                frames.forEach((blob, idx) => formData.append('frames', blob, `frame_${idx}.jpg`));
+                formData.append('liveness_data', loginLiveness.getSubmissionData());
+
+                const response = await fetch('{{ url_for("user.login_face_web") }}', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert('Face recognized successfully.', 'success');
+                    setTimeout(() => {
+                        window.location.href = result.redirect;
+                    }, 1000);
+                } else {
+                    showAlert(result.error, 'error');
+                    await loginLiveness.restart();
+                }
+            } catch (error) {
+                showAlert('Face recognition failed. Please try again.', 'error');
+                await loginLiveness.restart();
+            }
+        });
+
+        window.addEventListener('beforeunload', stopFaceCamera);
+    </script>
+</body>
+</html>

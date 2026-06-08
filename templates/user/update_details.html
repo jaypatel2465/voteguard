@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Update Details | VoteGuard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="user-page">
+    <nav class="navbar">
+        <div class="nav-brand">
+    <img src="{{ url_for('static', filename='img/voteguard-mark.svg') }}" alt="VoteGuard logo" class="brand-mark">
+    <div class="brand-copy">
+        <span class="brand-name">VoteGuard</span>
+        <span class="brand-subtitle">Voter Portal</span>
+    </div>
+</div>
+        <div class="nav-links">
+            <a href="{{ url_for('user.home') }}" class="btn btn-secondary">Back</a>
+            <a href="{{ url_for('user.logout') }}" class="btn btn-secondary">Logout</a>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <h1 class="page-title">Update Your Details</h1>
+        
+        <div class="form-card">
+            <form id="updateForm" enctype="multipart/form-data">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="first_name">First Name</label>
+                        <input type="text" id="first_name" name="first_name" value="{{ user.first_name }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="middle_name">Middle Name</label>
+                        <input type="text" id="middle_name" name="middle_name" value="{{ user.middle_name or '' }}">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="last_name">Last Name</label>
+                    <input type="text" id="last_name" name="last_name" value="{{ user.last_name }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="phone">Phone (10 digits)</label>
+                    <input type="text" id="phone" name="phone" 
+                           pattern="\d{10}" maxlength="10" value="{{ user.phone }}">
+                </div>
+                
+                <div class="info-box">
+                    <p><strong>Note:</strong> Aadhaar ID and Email cannot be changed.</p>
+                    <p>Aadhaar: {{ masked_aadhar }}</p>
+                    <p>Email: {{ user.email }}</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="profile_image">Profile Photo</label>
+                    <input type="file" id="profile_image" name="profile_image" accept="image/*">
+                    {% if user.profile_image %}
+                        <div class="image-preview" id="profilePreview">
+                            <img src="{{ url_for('static', filename='uploads/profile_photos/' + user.profile_image) }}" alt="Profile photo">
+                        </div>
+                    {% else %}
+                        <div class="image-preview" id="profilePreview"></div>
+                    {% endif %}
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">New Password (leave blank to keep current)</label>
+                    <input type="password" id="password" name="password">
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-block">
+                    Update Details
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        document.getElementById('updateForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('{{ url_for("user.update_details") }}', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert(result.message, 'success');
+                    setTimeout(() => {
+                        window.location.href = '{{ url_for("user.home") }}';
+                    }, 1500);
+                } else {
+                    showAlert(result.error, 'error');
+                }
+            } catch (error) {
+                showAlert('Failed to update details', 'error');
+            }
+        });
+
+        setupFilePreview('profile_image', 'profilePreview');
+    </script>
+</body>
+</html>

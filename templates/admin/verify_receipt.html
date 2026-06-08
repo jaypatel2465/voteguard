@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Receipt | VoteGuard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body class="admin-page">
+    <nav class="navbar">
+        <div class="nav-brand">
+            <img src="{{ url_for('static', filename='img/voteguard-mark.svg') }}" alt="VoteGuard logo" class="brand-mark">
+            <div class="brand-copy">
+                <span class="brand-name">VoteGuard</span>
+                <span class="brand-subtitle">Admin Control Panel</span>
+            </div>
+        </div>
+        <div class="nav-links">
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">Back</a>
+            <a href="{{ url_for('admin.logout') }}" class="btn btn-secondary">Logout</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <span class="portal-label">Receipt Verification</span>
+        <h1 class="page-title">Verify Acknowledgement Slip</h1>
+
+        <div class="dev-callout">
+            <strong>Scanner Ready:</strong> Start the camera for live scanning, or upload a QR image if camera access is blocked or unsupported.
+        </div>
+
+        {% if error %}
+        <div class="alert alert-error">
+            <p>{{ error }}</p>
+        </div>
+        {% endif %}
+
+        {% if verified %}
+        <div class="form-card">
+            <h3>Receipt Details <span class="badge badge-success">Verified</span></h3>
+            <div class="info-grid">
+                {% if voter.profile_image %}
+                <div class="info-item">
+                    <span class="info-label">Photo:</span>
+                    <span class="info-value">
+                        <img class="profile-thumb" src="{{ url_for('static', filename='uploads/profile_photos/' + voter.profile_image) }}" alt="Profile photo">
+                    </span>
+                </div>
+                {% endif %}
+                <div class="info-item">
+                    <span class="info-label">Voter:</span>
+                    <span class="info-value">{{ voter.first_name }} {{ voter.last_name }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Aadhaar:</span>
+                    <span class="info-value">{{ masked_aadhar }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Candidate:</span>
+                    <span class="info-value">{{ candidate.candidate_name if candidate else 'Unknown' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Party:</span>
+                    <span class="info-value">{{ candidate.party_name if candidate else 'Unknown' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Poll:</span>
+                    <span class="info-value">{{ poll.title if poll else 'N/A' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Timestamp:</span>
+                    <span class="info-value">{{ receipt.generated_at }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Receipt Hash:</span>
+                    <span class="info-value">{{ receipt.receipt_hash }}</span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="form-card">
+            <h3>Scan QR Code</h3>
+            <p class="muted-text">Use your camera to scan the QR code on the acknowledgement slip.</p>
+            <div class="camera-box">
+                <div id="qrReader" class="qr-reader-host"></div>
+                <video id="qrVideo" class="qr-reader-fallback hidden" autoplay playsinline></video>
+            </div>
+            <div class="form-actions">
+                <button id="startScan" class="btn btn-primary" type="button">Start Scan</button>
+                <button id="stopScan" class="btn btn-secondary" type="button">Stop Scan</button>
+            </div>
+            <div class="form-actions form-actions-compact">
+                <label class="btn btn-secondary btn-file" for="qrImageInput">Upload QR Image</label>
+                <input id="qrImageInput" type="file" accept="image/*" hidden>
+            </div>
+            <p id="scanStatus" class="muted-text status-note"></p>
+        </div>
+
+        <div class="form-card">
+            <h3>Manual Verification</h3>
+            <form id="manualForm">
+                <div class="form-group">
+                    <label for="receipt_hash">Receipt Hash</label>
+                    <input type="text" id="receipt_hash" name="receipt_hash" placeholder="Enter receipt hash" required>
+                </div>
+                <button class="btn btn-primary" type="submit">Verify</button>
+            </form>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        function extractReceiptHash(value) {
+            if (!value) return null;
+            if (value.includes('/admin/verify-receipt/')) {
+                const parts = value.split('/admin/verify-receipt/');
+                return parts[1] ? parts[1].trim() : null;
+            }
+            const cleaned = value.trim();
+            const isValid = /^[A-F0-9]{16}$/i.test(cleaned);
+            return isValid ? cleaned : null;
+        }
+
+        function handleCode(value) {
+            const hash = extractReceiptHash(value);
+            if (!hash) {
+                qrScanner.updateStatus('Invalid or unverified receipt QR.');
+                showAlert('Invalid or unverified receipt QR.', 'error');
+                return;
+            }
+            window.location.href = `/admin/verify-receipt/${hash}`;
+        }
+
+        const qrScanner = VotingSystem.createQrScanner({
+            readerId: 'qrReader',
+            videoId: 'qrVideo',
+            statusId: 'scanStatus',
+            startButtonId: 'startScan',
+            stopButtonId: 'stopScan',
+            fileInputId: 'qrImageInput',
+            onDecodedText: handleCode,
+            labels: {
+                idle: 'Ready to scan a receipt QR.',
+                liveUnsupported: 'Live QR scanning is not available here. Upload a QR image or enter the receipt hash manually.',
+                secureContextRequired: 'Camera access requires HTTPS or localhost. Upload a QR image or enter the receipt hash manually.'
+            }
+        });
+
+        qrScanner.updateStatus('Ready to scan a receipt QR.');
+
+        document.getElementById('manualForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const hash = document.getElementById('receipt_hash').value.trim();
+            if (!hash) return;
+            handleCode(hash);
+        });
+    </script>
+</body>
+</html>

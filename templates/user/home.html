@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voter Home | VoteGuard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="user-page">
+    <nav class="navbar">
+        <div class="nav-brand">
+            <img src="{{ url_for('static', filename='img/voteguard-mark.svg') }}" alt="VoteGuard logo" class="brand-mark">
+            <div class="brand-copy">
+                <span class="brand-name">VoteGuard</span>
+                <span class="brand-subtitle">Voter Portal</span>
+            </div>
+        </div>
+        <div class="nav-links">
+            <a href="{{ url_for('user.logout') }}" class="btn btn-secondary">Logout</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <span class="portal-label">Verified Voter Workspace</span>
+        <h1 class="page-title">Welcome, {{ user.first_name }} {{ user.last_name }}</h1>
+        <p class="muted-text">Review your registered details, open polls, and voting status from one clean dashboard.</p>
+
+        <div class="user-info-card">
+            <h3>Your Information</h3>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Aadhaar:</span>
+                    <span class="info-value">{{ masked_aadhar }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Email:</span>
+                    <span class="info-value">{{ user.email }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Phone:</span>
+                    <span class="info-value">{{ user.phone }}</span>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="user-info-card">
+            <h3>Available Polls</h3>
+            {% if polls %}
+            <div class="polls-grid">
+                {% for poll in polls %}
+                <div class="poll-card">
+                    <div class="poll-header">
+                        <h4>{{ poll.title }}</h4>
+                        {% if poll.status == 'active' %}
+                            <span class="badge badge-success">Active</span>
+                        {% elif poll.status == 'upcoming' %}
+                            <span class="badge badge-info">Upcoming</span>
+                        {% elif poll.status == 'closed' %}
+                            <span class="badge badge-secondary">Closed</span>
+                        {% else %}
+                            <span class="badge badge-warning">Inactive</span>
+                        {% endif %}
+                    </div>
+                    {% if poll.description %}
+                    <p class="muted-text">{{ poll.description }}</p>
+                    {% endif %}
+                    {% if poll.poll_start_time and poll.poll_end_time %}
+                        <p class="muted-text">{{ poll.poll_start_time }} to {{ poll.poll_end_time }}</p>
+                    {% else %}
+                        <p class="muted-text">Manual poll with no time window.</p>
+                    {% endif %}
+                    {% if poll.is_open %}
+                        {% if poll.has_voted %}
+                            <span class="badge badge-success">Voted</span>
+                            {% if poll.receipt %}
+                                <a class="btn btn-secondary btn-small" href="{{ url_for('voting.get_receipt', receipt_hash=poll.receipt.receipt_hash) }}">
+                                    Download Slip
+                                </a>
+                            {% endif %}
+                        {% else %}
+                            <button class="btn btn-primary btn-small" onclick="startVoting({{ poll.id }}, this)">Start Voting</button>
+                        {% endif %}
+                    {% else %}
+                        {% if poll.has_voted and poll.receipt %}
+                            <a class="btn btn-secondary btn-small" href="{{ url_for('voting.get_receipt', receipt_hash=poll.receipt.receipt_hash) }}">
+                                Download Slip
+                            </a>
+                        {% else %}
+                            <p class="muted-text">Voting is not open right now.</p>
+                        {% endif %}
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="muted-text">No polls are available right now.</p>
+            {% endif %}
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="dashboard-card">
+                <div class="card-icon">ID</div>
+                <h3>Voter E-ID Card</h3>
+                <p>Download your digital voter ID card as a PDF copy.</p>
+                <div class="entry-actions">
+                    <a class="btn btn-primary" href="{{ url_for('user.id_card_download') }}">Download PDF</a>
+                </div>
+            </div>
+
+            <div class="dashboard-card" onclick="location.href='{{ url_for('user.update_details') }}'">
+                <div class="card-icon">UP</div>
+                <h3>Update Details</h3>
+                <p>Review and update your registered voter information.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="faceModal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Face Verification</h2>
+            <p>Align your face, complete the live challenge, then continue to secure voting.</p>
+            <div class="camera-box">
+                <video id="verifyPreview" autoplay playsinline></video>
+                <div class="liveness-overlay">
+                    <span class="liveness-badge">Random Live Check</span>
+                    <p id="voteLivenessInstruction" class="liveness-instruction">Starting camera...</p>
+                    <div class="liveness-meta">
+                        <span id="voteLivenessStatus" class="liveness-status" data-state="info">Waiting for camera access.</span>
+                        <span id="voteLivenessCountdown" class="liveness-countdown"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary hidden" id="retryVoteLivenessBtn" type="button">Retry Challenge</button>
+                <button class="btn btn-secondary" onclick="closeFaceModal()">Cancel</button>
+                <button class="btn btn-primary" id="captureFaceBtn" type="button" disabled>Complete liveness verification</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+    <script src="{{ url_for('static', filename='js/liveness.js') }}"></script>
+    <script>
+        let verifyStream = null;
+        let currentPollId = null;
+        let activeButton = null;
+        const captureFaceBtn = document.getElementById('captureFaceBtn');
+        const voteLiveness = VotingSystem.createActiveLiveness({
+            videoId: 'verifyPreview',
+            instructionId: 'voteLivenessInstruction',
+            statusId: 'voteLivenessStatus',
+            countdownId: 'voteLivenessCountdown',
+            retryButtonId: 'retryVoteLivenessBtn',
+            actionButtonId: 'captureFaceBtn',
+            challengeUrl: '{{ url_for("voting.voting_liveness_challenge") }}',
+            challengePayload: () => currentPollId ? { poll_id: currentPollId } : null,
+            waitingLabel: 'Complete liveness verification',
+            readyLabel: 'Capture and Continue',
+            onError: () => {
+                showAlert('Live verification is unavailable right now. Please retry the camera step.', 'error');
+            }
+        });
+
+        async function startVoting(pollId, button) {
+            if (button) {
+                button.disabled = true;
+                button.textContent = 'Verifying face...';
+            }
+
+            try {
+                currentPollId = pollId;
+                activeButton = button || null;
+                const video = document.getElementById('verifyPreview');
+                const modal = document.getElementById('faceModal');
+                modal.classList.remove('hidden');
+                modal.style.display = 'flex';
+                lockBodyScroll();
+
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error('Camera access is not supported in this browser.');
+                }
+
+                verifyStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user' },
+                    audio: false
+                });
+                video.srcObject = verifyStream;
+                captureFaceBtn.disabled = true;
+                captureFaceBtn.textContent = 'Complete liveness verification';
+                await voteLiveness.start();
+            } catch (error) {
+                showAlert(error.message || 'Verification failed. Please try again.', 'error');
+                closeFaceModal();
+                if (button) {
+                    button.disabled = false;
+                    button.textContent = 'Start Voting';
+                }
+            }
+        }
+
+        async function captureVoteFrames(video, count = 10, interval = 250) {
+            const frames = [];
+            for (let i = 0; i < count; i++) {
+                await new Promise(r => setTimeout(r, interval));
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 480;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+                frames.push(blob);
+            }
+            return frames;
+        }
+
+        captureFaceBtn.addEventListener('click', async () => {
+            if (!voteLiveness.isPassed() || !currentPollId) {
+                showAlert('Complete the live challenge before continuing.', 'error');
+                return;
+            }
+
+            const video = document.getElementById('verifyPreview');
+            captureFaceBtn.disabled = true;
+            captureFaceBtn.textContent = 'Capturing frames...';
+
+            try {
+                const frames = [
+                    ...voteLiveness.getEvidenceFrames(),
+                    ...(await captureVoteFrames(video, 10, 200))
+                ];
+                const formData = new FormData();
+                frames.forEach((blob, idx) => formData.append('frames', blob, `frame_${idx}.jpg`));
+                formData.append('poll_id', currentPollId);
+                formData.append('liveness_data', voteLiveness.getSubmissionData());
+
+                const response = await fetch('{{ url_for("voting.verify_face_web") }}', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert('Face verified successfully.', 'success');
+                    closeFaceModal();
+                    setTimeout(() => {
+                        window.location.href = result.redirect;
+                    }, 1500);
+                } else {
+                    showAlert(result.error, 'error');
+                    await voteLiveness.restart();
+                }
+            } catch (error) {
+                showAlert('Verification failed. Please try again.', 'error');
+                await voteLiveness.restart();
+            }
+        });
+
+        function closeFaceModal() {
+            const modal = document.getElementById('faceModal');
+            modal.classList.add('hidden');
+            modal.style.display = 'none';
+            voteLiveness.stop();
+            if (verifyStream) {
+                verifyStream.getTracks().forEach(t => t.stop());
+                verifyStream = null;
+            }
+            captureFaceBtn.disabled = true;
+            captureFaceBtn.textContent = 'Complete liveness verification';
+            unlockBodyScroll();
+            if (activeButton) {
+                activeButton.disabled = false;
+                activeButton.textContent = 'Start Voting';
+            }
+            currentPollId = null;
+            activeButton = null;
+        }
+    </script>
+</body>
+</html>

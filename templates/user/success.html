@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Success | VoteGuard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="user-page">
+    <div class="container-center">
+        <div class="success-card">
+            <div class="success-icon">✓</div>
+            <h1>{{ message or 'Success!' }}</h1>
+            {% if redirect_url %}
+            <a href="{{ redirect_url }}" class="btn btn-primary">
+                Continue
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

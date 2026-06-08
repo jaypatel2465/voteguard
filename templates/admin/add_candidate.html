@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Candidate | VoteGuard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="admin-page">
+    <nav class="navbar">
+        <div class="nav-brand">
+    <img src="{{ url_for('static', filename='img/voteguard-mark.svg') }}" alt="VoteGuard logo" class="brand-mark">
+    <div class="brand-copy">
+        <span class="brand-name">VoteGuard</span>
+        <span class="brand-subtitle">Admin Control Panel</span>
+    </div>
+</div>
+        <div class="nav-links">
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">Back</a>
+            <a href="{{ url_for('admin.logout') }}" class="btn btn-secondary">Logout</a>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <h1 class="page-title">Add Candidate</h1>
+        
+        <div class="form-card">
+            <form id="candidateForm" enctype="multipart/form-data">
+                {% if polls %}
+                <div class="form-group">
+                    <label for="poll_id">Poll *</label>
+                    <select id="poll_id" name="poll_id" required>
+                        {% for poll in polls %}
+                            <option value="{{ poll.id }}" {% if active_poll and poll.id == active_poll.id %}selected{% endif %}>
+                                {{ poll.title }} {% if poll.is_active == 1 %}(Active){% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% else %}
+                <div class="alert alert-warning">
+                    <p>No polls found. Please create a poll first.</p>
+                </div>
+                {% endif %}
+
+                <div class="form-group">
+                    <label for="candidate_name">Candidate Name *</label>
+                    <input type="text" id="candidate_name" name="candidate_name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="party_name">Party Name *</label>
+                    <input type="text" id="party_name" name="party_name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="age">Candidate Age</label>
+                    <input type="number" id="age" name="age" min="18" max="120">
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Candidate Description</label>
+                    <textarea id="description" name="description" rows="3" placeholder="Short bio or manifesto summary"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="party_symbol">Party Symbol (Image)</label>
+                    <input type="file" id="party_symbol" name="party_symbol" accept="image/*">
+                    <div id="imagePreview" class="image-preview"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="manifesto">Manifesto (PDF)</label>
+                    <input type="file" id="manifesto" name="manifesto" accept="application/pdf">
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-block" {% if not polls %}disabled{% endif %}>
+                    Add Candidate
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        // Image preview
+        document.getElementById('party_symbol').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    document.getElementById('imagePreview').innerHTML = 
+                        `<img src="${e.target.result}" alt="Preview">`;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        // Form submission
+        document.getElementById('candidateForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('{{ url_for("admin.add_candidate") }}', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert(result.message, 'success');
+                    e.target.reset();
+                    document.getElementById('imagePreview').innerHTML = '';
+                } else {
+                    showAlert(result.error, 'error');
+                }
+            } catch (error) {
+                showAlert('Failed to add candidate', 'error');
+            }
+        });
+    </script>
+</body>
+</html>

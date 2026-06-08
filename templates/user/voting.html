@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vote | VoteGuard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="user-page">
+    <nav class="navbar">
+        <div class="nav-brand">
+            <img src="{{ url_for('static', filename='img/voteguard-mark.svg') }}" alt="VoteGuard logo" class="brand-mark">
+            <div class="brand-copy">
+                <span class="brand-name">VoteGuard</span>
+                <span class="brand-subtitle">Voter Portal</span>
+            </div>
+        </div>
+        <div class="nav-links">
+            <a href="{{ url_for('user.home') }}" class="btn btn-secondary">Back</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <span class="portal-label">Ballot Workspace</span>
+        <h1 class="page-title">Select Your Candidate{% if poll %} | {{ poll.title }}{% endif %}</h1>
+
+        <div class="info-box voting-instruction">
+            <p>Choose one candidate to submit your vote. Each voter can cast only one ballot for an eligible poll.</p>
+        </div>
+
+        {% if candidates %}
+        <div class="candidates-grid">
+            {% for candidate in candidates %}
+            <div class="candidate-card" data-candidate-id="{{ candidate.id }}">
+                <div class="candidate-symbol">
+                    {% if candidate.party_symbol %}
+                    <img src="{{ url_for('static', filename='uploads/party_symbols/' + candidate.party_symbol) }}"
+                         alt="{{ candidate.party_name }}">
+                    {% else %}
+                    <div class="symbol-placeholder">No Symbol</div>
+                    {% endif %}
+                </div>
+                <div class="candidate-info">
+                    <h3>{{ candidate.candidate_name }}</h3>
+                    <p class="party-name">{{ candidate.party_name }}</p>
+                    {% if candidate.age %}
+                    <p class="candidate-meta">Age: {{ candidate.age }}</p>
+                    {% endif %}
+                    {% if candidate.description %}
+                    <p class="candidate-meta">{{ candidate.description }}</p>
+                    {% endif %}
+                    {% if candidate.manifesto_path %}
+                    <a class="btn btn-secondary btn-small"
+                       href="{{ url_for('candidates.manifesto', filename=candidate.manifesto_path) }}" target="_blank">
+                        View Manifesto
+                    </a>
+                    {% endif %}
+                </div>
+                <button class="btn btn-primary vote-btn" onclick="castVote({{ candidate.id }}, '{{ candidate.candidate_name }}', '{{ candidate.party_name }}')">
+                    Vote
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            <p>No candidates are available for the active poll.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div id="confirmModal" class="modal">
+        <div class="modal-content">
+            <h2>Confirm Your Vote</h2>
+            <p>Review your selection before submitting the ballot.</p>
+            <div id="confirmDetails" class="info-box inline-note"></div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" id="confirmVoteBtn">Confirm Vote</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        let selectedCandidateId = null;
+
+        function castVote(candidateId, candidateName, partyName) {
+            selectedCandidateId = candidateId;
+
+            document.getElementById('confirmDetails').innerHTML = `
+                <p><strong>${candidateName}</strong></p>
+                <p>${partyName}</p>
+            `;
+            document.getElementById('confirmModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('confirmModal').style.display = 'none';
+            selectedCandidateId = null;
+        }
+
+        document.getElementById('confirmVoteBtn').addEventListener('click', async () => {
+            if (!selectedCandidateId) return;
+
+            const button = document.getElementById('confirmVoteBtn');
+            button.disabled = true;
+            button.textContent = 'Submitting...';
+
+            try {
+                const response = await fetch('{{ url_for("voting.submit_vote") }}', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({candidate_id: selectedCandidateId})
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    closeModal();
+                    showAlert('Vote submitted successfully.', 'success');
+                    setTimeout(() => {
+                        window.location.href = result.redirect;
+                    }, 2000);
+                } else {
+                    showAlert(result.error, 'error');
+                    button.disabled = false;
+                    button.textContent = 'Confirm Vote';
+                }
+            } catch (error) {
+                showAlert('Failed to submit vote. Please try again.', 'error');
+                button.disabled = false;
+                button.textContent = 'Confirm Vote';
+            }
+        });
+
+        document.getElementById('confirmModal').addEventListener('click', (e) => {
+            if (e.target.id === 'confirmModal') {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>

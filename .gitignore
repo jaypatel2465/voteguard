@@ -1,0 +1,89 @@
+# ============================================================
+# VoteGuard — .gitignore
+# ============================================================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+env/
+.env/
+.venv/
+ENV/
+
+# Environment variables / secrets
+.env
+.env.*
+*.env
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# IDEs / editors
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# macOS
+.DS_Store
+**/.DS_Store
+__MACOSX/
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# ============================================================
+# Project-specific
+# ============================================================
+
+# SQLite database (contains real voter data — never commit)
+database/voting.db
+*.db
+*.sqlite3
+
+# Pre-trained ML model binaries (too large; must be downloaded separately)
+models/face_detector/*.caffemodel
+models/face_embedding/*.t7
+
+# Trained SVM/pickle model (generated at runtime)
+models/*.pkl
+models/face_recognition_model.pkl
+
+# All user-uploaded runtime data
+static/uploads/face_dataset/*
+static/uploads/profile_photos/*
+static/uploads/party_symbols/*
+static/uploads/manifestos/*
+static/uploads/id_cards/*
+static/uploads/receipts/*
+
+# Keep directory structure tracked via .gitkeep
+!static/uploads/face_dataset/.gitkeep
+!static/uploads/profile_photos/.gitkeep
+!static/uploads/party_symbols/.gitkeep
+!static/uploads/manifestos/.gitkeep
+!static/uploads/id_cards/.gitkeep
+!static/uploads/receipts/.gitkeep
+
+# Demo / internal files — should not be in a public repo
+Demo_Manifesto.pdf
+Demo_Symbol1.png
+Demo_Symbol2.png
+Mini Project Report.pdf

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voter Registration | VoteGuard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="user-page">
+    <div class="container-center">
+        <div class="auth-card">
+            <div class="auth-brand">
+                <div class="brand-lockup">
+                    <img src="{{ url_for('static', filename='img/voteguard-mark.svg') }}" alt="VoteGuard logo" class="brand-mark">
+                    <div class="brand-copy">
+                        <span class="brand-name">VoteGuard</span>
+                        <span class="brand-subtitle">Voter Registration</span>
+                    </div>
+                </div>
+            </div>
+            <div class="auth-header">
+                <h1>Voter Registration</h1>
+                <p>Create your verified VoteGuard voter profile.</p>
+            </div>
+
+            <form id="registerForm" enctype="multipart/form-data">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="first_name">First Name *</label>
+                        <input type="text" id="first_name" name="first_name" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="middle_name">Middle Name</label>
+                        <input type="text" id="middle_name" name="middle_name">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="last_name">Last Name *</label>
+                    <input type="text" id="last_name" name="last_name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="aadhar_id">Aadhaar ID (12 digits) *</label>
+                    <input type="text" id="aadhar_id" name="aadhar_id" pattern="\d{12}" maxlength="12" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="phone">Phone (10 digits) *</label>
+                    <input type="text" id="phone" name="phone" pattern="\d{10}" maxlength="10" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email *</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password *</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="profile_image">Profile Photo (for E-ID) *</label>
+                    <input type="file" id="profile_image" name="profile_image" accept="image/*" required>
+                    <div class="image-preview" id="profilePreview"></div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block">Register</button>
+            </form>
+
+            <div class="auth-footer">
+                Already registered? <a href="{{ url_for('user.login') }}">Login</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData(e.target);
+
+            try {
+                const response = await fetch('{{ url_for("user.register") }}', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert(result.message, 'success');
+                    setTimeout(() => {
+                        window.location.href = result.redirect;
+                    }, 1500);
+                } else {
+                    showAlert(result.error, 'error');
+                }
+            } catch (error) {
+                showAlert('Registration failed. Please try again.', 'error');
+            }
+        });
+        setupFilePreview('profile_image', 'profilePreview');
+    </script>
+</body>
+</html>
